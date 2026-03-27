@@ -45,4 +45,9 @@ module.exports = {
     }),
     new HtmlWebpackPlugin({ template: './public/index.html' }),
   ],
+  shared: {
+    react: { singleton: true, requiredVersion: '^18.0.0' },
+    'react-dom': { singleton: true, requiredVersion: '^18.0.0' },
+    'shared/eventBus': { singleton: true }
+  }
 };

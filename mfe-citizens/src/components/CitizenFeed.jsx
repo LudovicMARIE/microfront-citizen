@@ -17,7 +17,6 @@ const PANIC_POSTS = {
     { text: 'COUPURE CHEZ MOI !! 😱', delay: 1000 },
     { text: 'Les ascenseurs bloqués!! 🆘', delay: 1000 },
     { text: 'TOUT EST NOIR 🔌', delay: 1000 },
-    { text: 'Qui a du courant??', delay: 1000 },
   ],
   riot: [
     { text: 'ANONYMOUS EST LÀ 🔥🔥🔥', delay: 1000 },
@@ -27,13 +26,21 @@ const PANIC_POSTS = {
   love: [
     { text: 'C\'est magnifique 😭', delay: 3000 },
     { text: 'Je comprends pas mais je pleure ?? 🥺', delay: 3000 },
-    { text: 'Ressenti de l\'amour... 💜💜💜', delay: 3000 },
   ],
+  drones: [
+    { text: 'Regardez le ciel ! Les drones forment un truc ! 🛸', delay: 2000 },
+    { text: 'Encore la corpo de drones qui fait sa pub... 🙄', delay: 3000 },
+    { text: 'Wow l\'essaim de drones au dessus du secteur 4 📸', delay: 2000 },
+  ],
+  hospital_crisis: [
+    { text: 'Les urgences débordent, restez chez vous ! 🚑', delay: 1000 },
+    { text: 'On manque de lits au MedCenter ! 🏥🆘', delay: 1000 },
+  ]
 };
 
 const AVATARS = ['👥', '🤖', '👨', '👩', '👾', '🎭', '🕵️', '💀'];
 
-function generatePost(category = 'calm') {
+function generatePost(category = 'calm', customText = null) {
   const posts = PANIC_POSTS[category] || PANIC_POSTS.calm;
   const post = posts[Math.floor(Math.random() * posts.length)];
   const avatar = AVATARS[Math.floor(Math.random() * AVATARS.length)];
@@ -43,7 +50,7 @@ function generatePost(category = 'calm') {
     id: Date.now() + Math.random(),
     avatar,
     user,
-    text: post.text,
+    text: customText || post.text,
     timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
     delay: post.delay,
   };
@@ -58,24 +65,20 @@ export default function CitizenFeed() {
   const postIntervalRef = useRef(null);
   const unsubscribesRef = useRef([]);
 
-  // Calculate crisis state based on panic level
   const updateCrisisState = (level) => {
     setIsCrisis(level > 40);
     setPanicLevel(level);
 
-    // Emit crowd:panic event
     const hashtags = ['#Panic', '#CrashNet', '#Blackout', '#Riot', '#SOS'];
-    const trending = hashtags[Math.floor(Math.random() * hashtags.length)];
-    setTrending(trending);
+    const newTrending = level > 40 ? hashtags[Math.floor(Math.random() * hashtags.length)] : '#CalmNight';
+    setTrending(newTrending);
+    
     eventBus.emit('crowd:panic', {
       level: Math.min(level, 100),
-      trending: trending,
+      trending: newTrending,
     });
-
-    console.log(`🚨 PANIC LEVEL: ${level} | TRENDING: ${trending}`);
   };
 
-  // Generate new posts at intervals
   useEffect(() => {
     const generatePostsInterval = () => {
       let category = 'calm';
@@ -94,88 +97,83 @@ export default function CitizenFeed() {
 
       postIntervalRef.current = setInterval(() => {
         const newPost = generatePost(category);
-        setPosts(prevPosts => {
-          const updated = [newPost, ...prevPosts];
-          return updated.slice(0, 20); // Keep max 20 posts
-        });
+        setPosts(prevPosts => [newPost, ...prevPosts].slice(0, 20));
       }, interval);
     };
 
     generatePostsInterval();
 
     return () => {
-      if (postIntervalRef.current) {
-        clearInterval(postIntervalRef.current);
-      }
+      if (postIntervalRef.current) clearInterval(postIntervalRef.current);
     };
   }, [panicLevel]);
 
-  // Listen to events
   useEffect(() => {
     const unsubPowerOutage = eventBus.on('power:outage', ({ severity, cityPower }) => {
-      console.log('⚡ Power Outage:', { severity, cityPower });
-      setPosts([generatePost('blackout')]);
-      updateCrisisState(87);
+      setPosts(prev => [generatePost('blackout'), ...prev].slice(0, 20));
+      updateCrisisState(severity === 'total' ? 87 : 60);
     });
 
     const unsubWeatherChange = eventBus.on('weather:change', ({ condition, toxicity }) => {
-      console.log('🌦️ Weather Change:', { condition, toxicity });
+      if (toxicity > 40) setPosts(prev => [generatePost('storm'), ...prev].slice(0, 20));
       const level = Math.min(45 + (toxicity || 20), 80);
       updateCrisisState(level);
     });
 
     const unsubHackerCommand = eventBus.on('hacker:command', ({ command }) => {
-      console.log('🔓 Hacker Command:', command);
-
       if (command === 'riot') {
-        setPosts([generatePost('riot')]);
+        setPosts(prev => [generatePost('riot'), ...prev].slice(0, 20));
         updateCrisisState(95);
       } else if (command === 'love') {
-        setPosts([generatePost('love')]);
+        setPosts(prev => [generatePost('love'), ...prev].slice(0, 20));
         updateCrisisState(10);
       } else if (command === 'reset') {
-        setPosts([generatePost('calm')]);
+        setPosts([generatePost('calm')]); 
         updateCrisisState(5);
       }
     });
 
-    unsubscribesRef.current = [unsubPowerOutage, unsubWeatherChange, unsubHackerCommand];
+    const unsubDrones = eventBus.on('drone:formation', ({ formation }) => {
+      console.log('🛸 Drones repérés:', formation);
+      setPosts(prev => [generatePost('drones', `Les drones se mettent en formation "${formation}" !`), ...prev].slice(0, 20));
+    });
+
+    const unsubHospital = eventBus.on('hospital:alert', ({ status, beds }) => {
+      console.log('🏥 Alerte Hôpital:', status);
+      if (status === 'critical' || (beds && beds.available < 15)) {
+        setPosts(prev => [generatePost('hospital_crisis'), ...prev].slice(0, 20));
+        updateCrisisState(Math.min(panicLevel + 25, 100));
+      }
+    });
+
+    unsubscribesRef.current = [unsubPowerOutage, unsubWeatherChange, unsubHackerCommand, unsubDrones, unsubHospital];
 
     return () => {
-      unsubscribesRef.current.forEach(unsub => unsub());
+      unsubscribesRef.current.forEach(unsub => {
+        if (typeof unsub === 'function') unsub();
+      });
     };
-  }, []);
+  }, [panicLevel]);
 
-  // Simulate button handlers
   const handleSimulate = (type) => {
-    console.log(`🎬 Simulating: ${type}`);
-
     switch (type) {
-      case 'storm':
-        eventBus.emit('weather:change', { condition: 'toxic_rain', toxicity: 75 });
-        break;
-      case 'blackout':
-        eventBus.emit('power:outage', { severity: 'critical', cityPower: 0 });
-        break;
-      case 'riot':
-        eventBus.emit('hacker:command', { command: 'riot' });
-        break;
-      case 'love':
-        eventBus.emit('hacker:command', { command: 'love' });
-        break;
-      case 'reset':
-        eventBus.emit('hacker:command', { command: 'reset' });
-        break;
-      default:
-        break;
+      case 'storm': eventBus.emit('weather:change', { condition: 'toxic_rain', toxicity: 75 }); break;
+      case 'blackout': eventBus.emit('power:outage', { severity: 'critical', cityPower: 0 }); break;
+      case 'riot': eventBus.emit('hacker:command', { command: 'riot' }); break;
+      case 'love': eventBus.emit('hacker:command', { command: 'love' }); break;
+      case 'reset': eventBus.emit('hacker:command', { command: 'reset' }); break;
+      case 'hospital': eventBus.emit('hospital:alert', { status: 'critical', beds: { available: 5 } }); break;
+      default: break;
     }
   };
 
   const panicColor = panicLevel > 60 ? '#ff003c' : panicLevel > 40 ? '#ff6b35' : '#00ff88';
   const badgeEmoji = isCrisis ? '🔴' : '🟢';
+  
+  const extremePanicClass = panicLevel >= 90 ? 'extreme-panic-shake' : '';
 
   return (
-    <div className={`citizen-feed ${isCrisis ? 'crisis-mode' : ''}`}>
+    <div className={`citizen-feed ${isCrisis ? 'crisis-mode' : ''} ${extremePanicClass}`}>
       <div className="feed-header">
         <span>{badgeEmoji} NEOCITY SOCIAL - {onlineCount} en ligne</span>
         <span style={{ fontSize: '0.7rem', color: panicColor }}>
@@ -184,30 +182,21 @@ export default function CitizenFeed() {
       </div>
 
       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', order: '-1' }}>
-        <button className="simulate-btn" onClick={() => handleSimulate('storm')}>
-          WEATHER
-        </button>
-        <button className="simulate-btn" onClick={() => handleSimulate('blackout')}>
-          BLACKOUT
-        </button>
-        <button className="simulate-btn" onClick={() => handleSimulate('riot')}>
-          RIOT
-        </button>
-        <button className="simulate-btn" onClick={() => handleSimulate('love')}>
-          LOVE
-        </button>
-        <button className="simulate-btn" onClick={() => handleSimulate('reset')}>
-          RESET
-        </button>
+        <button className="simulate-btn" onClick={() => handleSimulate('storm')}>WEATHER</button>
+        <button className="simulate-btn" onClick={() => handleSimulate('blackout')}>BLACKOUT</button>
+        <button className="simulate-btn" onClick={() => handleSimulate('riot')}>RIOT</button>
+        <button className="simulate-btn" onClick={() => handleSimulate('love')}>LOVE</button>
+        <button className="simulate-btn" onClick={() => handleSimulate('hospital')}>HOSPITAL</button>
+        <button className="simulate-btn" onClick={() => handleSimulate('reset')}>RESET</button>
       </div>
 
       <div className="panic-bar">
-        <div className="panic-fill" style={{ width: `${panicLevel}%`, backgroundColor: panicColor }} />
+        <div className="panic-fill" style={{ width: `${panicLevel}%`, backgroundColor: panicColor, transition: 'width 0.5s ease-in-out, background-color 0.5s ease' }} />
       </div>
 
       <div className="feed-posts">
         {posts.map(post => (
-          <div key={post.id} className="post">
+          <div key={post.id} className="post new-post-animation">
             <div className="post-avatar">{post.avatar}</div>
             <div className="post-content">
               <div style={{ display: 'flex', gap: '6px' }}>
@@ -220,8 +209,8 @@ export default function CitizenFeed() {
         ))}
       </div>
 
-      <div style={{ fontSize: '0.65rem', color: '#4a5568' }}>
-        📡 listen: power:outage, weather:change, hacker:command | emit: crowd:panic
+      <div style={{ fontSize: '0.65rem', color: '#4a5568', marginTop: '10px', textAlign: 'center' }}>
+        📡 listen: power, weather, hacker, drones, hospital | emit: crowd:panic
       </div>
     </div>
   );
