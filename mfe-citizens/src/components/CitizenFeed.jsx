@@ -29,6 +29,13 @@ const PANIC_POSTS = {
     { text: 'Je comprends pas mais je pleure ?? 🥺', delay: 3000 },
     { text: 'Ressenti de l\'amour... 💜💜💜', delay: 3000 },
   ],
+  election: [
+    { text: 'OUAIS MACRON 🫦', delay: 3000 },
+    { text: 'Don\'t forget -> https://www.impots.gouv.fr/accueil', delay: 3000 },
+    { text: 'Macron Explosion !!!!', delay: 3000 },
+    { text: 'Jeanne OSKURRR', delay: 3000 },
+    { text: 'J\'ai le plaisir de vous lire le temps des tempêtes', delay: 3000 },
+  ],
 };
 
 const AVATARS = ['👥', '🤖', '👨', '👩', '👾', '🎭', '🕵️', '💀'];
@@ -90,6 +97,9 @@ export default function CitizenFeed() {
       } else if (panicLevel > 40) {
         category = 'storm';
         interval = 2000;
+      } else if (panicLevel > 20) {
+        category = 'election';
+        interval = 2000;
       }
 
       postIntervalRef.current = setInterval(() => {
@@ -133,6 +143,9 @@ export default function CitizenFeed() {
       } else if (command === 'love') {
         setPosts([generatePost('love')]);
         updateCrisisState(10);
+      } else if (command === 'election') {
+        setPosts([generatePost('election')]);
+        updateCrisisState(25);
       } else if (command === 'reset') {
         setPosts([generatePost('calm')]);
         updateCrisisState(5);
@@ -166,6 +179,9 @@ export default function CitizenFeed() {
       case 'reset':
         eventBus.emit('hacker:command', { command: 'reset' });
         break;
+      case 'election':
+        eventBus.emit('hacker:command', { command: 'election' });
+        break;
       default:
         break;
     }
@@ -195,6 +211,9 @@ export default function CitizenFeed() {
         </button>
         <button className="simulate-btn" onClick={() => handleSimulate('love')}>
           LOVE
+        </button>
+        <button className="simulate-btn" onClick={() => handleSimulate('election')}>
+          ELECTION
         </button>
         <button className="simulate-btn" onClick={() => handleSimulate('reset')}>
           RESET
