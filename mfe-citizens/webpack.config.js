@@ -39,15 +39,15 @@ module.exports = {
       filename: 'remoteEntry.js',
       exposes: { './CitizenFeed': './src/components/CitizenFeed' },
       shared: {
-        react: { singleton: true, requiredVersion: '^18.2.0' },
-        'react-dom': { singleton: true, requiredVersion: '^18.2.0' },
-      },
+        react: { singleton: true, requiredVersion: '^18.0.0' },
+        'react-dom': { singleton: true, requiredVersion: '^18.0.0' },
+        'shared/eventBus': { 
+          singleton: true,
+          requiredVersion: false,
+          version: '1.0.0',
+       },
+      }
     }),
     new HtmlWebpackPlugin({ template: './public/index.html' }),
   ],
-  shared: {
-    react: { singleton: true, requiredVersion: '^18.0.0' },
-    'react-dom': { singleton: true, requiredVersion: '^18.0.0' },
-    'shared/eventBus': { singleton: true }
-  }
 };
